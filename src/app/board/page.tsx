@@ -8,6 +8,7 @@ import {
   Transformer,
   Image,
   Text,
+  Group,
 } from "react-konva";
 import useImage from "use-image";
 
@@ -87,30 +88,167 @@ export function Rectangle({
   );
 }
 
+type CanvasNodeProps = {
+  nodeProps: nodeProps;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChange: (newAttrs: nodeProps) => void;
+};
+
 export function CanvasNode({
   nodeProps,
   isSelected,
   onSelect,
   onChange,
-  onMouseEnter,
-  onMouseLeave,
-}) {
-  const ImageStrategy = () => {
-    const nodeRef = useRef();
+}: CanvasNodeProps) {
+  const ImageStrategy = ({
+    nodeProps,
+    isSelected,
+    onSelect,
+    onChange,
+  }: CanvasNodeProps) => {
+    const [image] = useImage(nodeProps.url);
+    const imageReference = useRef<typeof Image>(null);
+    const transformerReference = useRef<typeof Transformer>(null);
+
+    useEffect(() => {
+      if (isSelected) {
+        transformerReference.current!.nodes([imageReference.current]);
+        transformerReference.current!.getLayer().batchDraw();
+      }
+    }, [isSelected]);
     return (
-      <Image
-        onDragEnd={(e) =>
-          onChange({ ...nodeProps, x: e.target.x(), y: e.target.y() })
-        }
-        draggable
-        ref={nodeRef}
-        {...nodeProps}
-      />
+      <>
+        <Image
+          ref={imageReference}
+          image={image}
+          draggable
+          onClick={onSelect}
+          onTap={onSelect}
+          onDragEnd={(e) => {
+            onChange({
+              ...nodeProps,
+              x: e.target.x(),
+              y: e.target.y(),
+            });
+          }}
+          onTransformEnd={(e) => {
+            const node = imageReference.current;
+            if (node === null) {
+              return;
+            }
+            const scaleX = node.scaleX();
+            const scaleY = node.scaleY();
+
+            node.scaleX(1);
+            node.scaleY(1);
+
+            onChange({
+              ...nodeProps,
+              x: node.x(),
+              y: node.y(),
+
+              width: Math.max(5, node.width() * scaleX),
+              height: Math.max(node.height() * scaleY),
+            });
+          }}
+          {...nodeProps}
+        />
+        {isSelected && (
+          <Transformer
+            ref={transformerReference}
+            flipEnabled={false}
+            rotateEnabled={false}
+            boundBoxFunc={(oldBox, newBox) => {
+              if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
+                return oldBox;
+              }
+              return newBox;
+            }}
+          />
+        )}
+      </>
     );
   };
   const GifStrategy = () => {};
-  const TextStrategy = () => {};
-  return <></>;
+  const TextStrategy = ({
+    nodeProps,
+    isSelected,
+    onSelect,
+    onChange,
+  }: CanvasNodeProps) => {
+    const textReference = useRef();
+    const transformerReference = useRef();
+
+    useEffect(() => {
+      if (isSelected) {
+        transformerReference.current.nodes([textReference.current]);
+        transformerReference.current.getLayer().batchDraw();
+      }
+    }, [isSelected]);
+    return (
+      <>
+        <Text
+          ref={textReference}
+          draggable
+          onClick={onSelect}
+          onTap={onSelect}
+          onDragEnd={(e) => {
+            onChange({ ...nodeProps, x: e.target.x(), y: e.target.y() });
+          }}
+          onTransformEnd={(e) => {
+            const node = textReference.current;
+            if (node === null) {
+              return;
+            }
+            const scaleX = node.scaleX();
+            const scaleY = node.scaleY();
+
+            node.scaleX(1);
+            node.scaleY(1);
+
+            onChange({
+              ...nodeProps,
+              x: node.x(),
+              y: node.y(),
+
+              width: Math.max(5, node.width() * scaleX),
+              height: Math.max(node.height() * scaleY),
+              fontSize: Math.max(node.height() * scaleY) / 2,
+            });
+          }}
+          {...nodeProps}
+        />
+        {isSelected && (
+          <Transformer
+            ref={transformerReference}
+            flipEnabled={false}
+            rotateEnabled={false}
+          />
+        )}
+      </>
+    );
+  };
+  return (
+    <>
+      {nodeProps.name === "image" && (
+        <ImageStrategy
+          nodeProps={nodeProps}
+          isSelected={isSelected}
+          onSelect={onSelect}
+          onChange={onChange}
+        />
+      )}
+      {nodeProps.name === "text" && (
+        <TextStrategy
+          nodeProps={nodeProps}
+          isSelected={isSelected}
+          onSelect={onSelect}
+          onChange={onChange}
+        />
+      )}
+    </>
+  );
 }
 
 const initialRectangles = [
@@ -132,106 +270,107 @@ const initialRectangles = [
   },
 ];
 
-let intervalId: NodeJS.Timeout;
+type nodeProps = {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  stroke?: string;
+  fontSize?: number;
+  url?: string;
+};
+
+type SelectionBoxCoordinatesProps = {
+  x1: string;
+  y1: string;
+  x2: string;
+  y2: string;
+};
+
+const defaultNodes: nodeProps[] = [
+  {
+    id: "1",
+    name: "text",
+    x: 10,
+    y: 10,
+    width: 150,
+    height: 50,
+    text: "Text that will be editable",
+    stroke: "blue",
+    fontSize: 25,
+  },
+  {
+    id: "2",
+    name: "image",
+    x: 459,
+    y: 300,
+    width: 100,
+    height: 100,
+    url: "https://picsum.photos/200/300",
+  },
+];
 
 export default function Board() {
-  const [isHovering, setIsHovering] = useState(false);
-  const [cursor, setCursor] = useState("default");
-  const [layer, setLayer] = useState([{}]);
-  const [selectedToolbarOption, setSelectedToolbarOption] = useState(0);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-  const [selectionBoxVisible, setSelectionBoxVisible] = useState(false);
-  const [isFirstClick, setIsFirstClick] = useState(true);
+  const [nodes, setNodes] = useState(defaultNodes);
+  const [selectId, setSelectId] = useState<null | number>(null);
+  const [selecting, setSelecting] = useState<boolean>(false);
+  const [selectionBoxCoordinates, setSelectionBoxCoordinates] =
+    useState<SelectionBoxCoordinatesProps | null>(null);
 
-  const [rectangles, setRectangles] = useState(initialRectangles);
-  const [selectedShape, setSelectedShape] = useState("");
-
-  const [stage, setStage] = useState();
-
-  const stageRef = useRef();
-  const shapeRef = useRef(null);
-  const textRef = useRef(null);
-  const imageRef = useRef();
-  const transformerRef = useRef();
-  const selectionLayerRef = useRef();
-  const selectionBoxRef = useRef();
-
-  const [image] = useImage("https://picsum.photos/200");
-
-  const onMouseEnterCanvas = () => {
-    setIsHovering(true);
-    setCursor("pointer");
-  };
-  const onMouseLeaveCanvas = () => {
-    setIsHovering(false);
-    setCursor("default");
-  };
+  const selectionRef = useRef<typeof Rect>(null);
 
   const checkDeselect = (e) => {
     const clickedOnEmpty = e.target === e.target.getStage();
+    const stage = e.target.getStage();
     if (clickedOnEmpty) {
-      setSelectedShape(null);
+      setSelectId(null);
     }
+
+    const x1 = stage.getPointerPosition().x;
+    const y1 = stage.getPointerPosition().y;
+    const x2 = stage.getPointerPosition().x;
+    const y2 = stage.getPointerPosition().y;
+
+    setSelectionBoxCoordinates({ x1: x1, y1: y1, x2: x2, y2: y2 });
+    selectionRef.current!.setAttr("width", 0);
+    selectionRef.current!.setAttr("height", 0);
+    setSelecting(true);
   };
 
-  const handleMouseDown = () => {
-    setIsMouseDown(true);
-    setIsFirstClick(true);
-  };
-
-  const repeat = (func) => {
-    intervalId = setInterval(func, 1);
-  };
-
-  const stop = () => {
-    clearInterval(intervalId);
-    setIsMouseDown(false);
-    setSelectionBoxVisible(false);
-  };
-
-  useEffect(() => {
-    if (isMouseDown) {
-      const currentPointerPosition = stage.currentTarget.pointerPos;
-
-      selectionBoxRef.current.setAttr("x", currentPointerPosition.x);
-      selectionBoxRef.current.setAttr("y", currentPointerPosition.y);
-      setSelectionBoxVisible(true);
-      repeat(drawRubberRectangle);
+  const mouseMoving = (e) => {
+    const stage = e.target.getStage();
+    if (!selecting) {
+      return;
     }
-  }, [isMouseDown]);
 
-  const drawRubberRectangle = () => {
-    // console.log(selectionBoxRef.current);
-    // console.log(e.target);
-    const absolutePointerPosition = stageRef.current;
+    e.evt.preventDefault();
+    const x2 = stage.getPointerPosition().x;
+    const y2 = stage.getPointerPosition().y;
 
-    // if (isFirstClick) {
-    //   console.log("stage: ", stage.currentTarget.pointerPos);
+    setSelectionBoxCoordinates({ ...selectionBoxCoordinates, x2: x2, y2: y2 });
 
-    //   setIsFirstClick(false);
-    // }
-    const theScaleX = selectionBoxRef.current.getAttr("scaleX");
-    const relativePos = selectionBoxRef.current.getRelativePointerPosition();
-    const newHeight = relativePos.y;
-    const newWidth = relativePos.x;
-
-    // selectionBoxRef.current.setAttr("scaleX", theScaleX + 1);
-    selectionBoxRef.current.setAttr("height", newHeight);
-    selectionBoxRef.current.setAttr("width", newWidth);
-    selectionBoxRef.current.getLayer().batchDraw();
+    selectionRef.current!.setAttrs({
+      visible: true,
+      x: Math.min(selectionBoxCoordinates.x1, selectionBoxCoordinates.x2),
+      y: Math.min(selectionBoxCoordinates.y1, selectionBoxCoordinates.y2),
+      width: Math.abs(selectionBoxCoordinates.x2 - selectionBoxCoordinates.x1),
+      height: Math.abs(selectionBoxCoordinates.y2 - selectionBoxCoordinates.y1),
+    });
   };
 
-  const addSquareToLayer = () => {
-    const xPos = Math.floor(Math.random() * 200);
-    const yPos = Math.floor(Math.random() * 200);
-    const fill = "green";
-    setLayer([...layer, { x: xPos, y: yPos, fill: fill }]);
-    setSelectedToolbarOption(1);
-  };
+  const mouseNotMoving = (e) => {
+    setSelecting(false);
+    if (!selectionRef.current!.getAttr("visible")) {
+      console.log("returning");
+      return;
+    }
 
-  //   useEffect(() => {
-  //     transformerRef.current.nodes([textRef.current, imageRef.current]);
-  //   }, []);
+    e.evt.preventDefault();
+    selectionRef.current.setAttr("visible", false);
+  };
   return (
     <div
       style={{
@@ -253,116 +392,48 @@ export default function Board() {
           width: "100%",
         }}
       >
-        <div
-          style={{
-            backgroundColor: "white",
-            border: "2px solid black",
-            marginRight: 10,
-          }}
-        >
-          <p>Toolbar</p>
-          <ul>
-            <li>
-              <button
-                onClick={() => {
-                  setSelectedToolbarOption(0);
-                }}
-                style={{
-                  backgroundColor: "white",
-                  border: "2px solid",
-                  borderColor: selectedToolbarOption === 0 ? "red" : "black",
-                }}
-              >
-                Text
-              </button>
-            </li>
-            <li>
-              <button
-                style={{
-                  backgroundColor: "white",
-                  border: "2px solid",
-                  borderColor: selectedToolbarOption === 1 ? "red" : "black",
-                }}
-                onClick={addSquareToLayer}
-              >
-                Gifs
-              </button>
-            </li>
-            <li>
-              <button>Upload Image</button>
-            </li>
-          </ul>
+        <div>
+          <div>
+            <button>T</button>
+          </div>
+          <div>
+            <button>Img</button>
+          </div>
+          <div>
+            <button>Vid</button>
+          </div>
         </div>
-        <div style={{ cursor: cursor, marginRight: 5 }}>
+        <div>
           <Stage
-            ref={stageRef}
-            width={800}
-            height={700}
+            width={1000}
+            height={1000}
             style={{ border: "2px solid black" }}
-            ref={shapeRef}
-            onMouseDown={(e) => {
-              setStage(e);
-              handleMouseDown();
-            }}
-            onMouseUp={stop}
-            onClick={checkDeselect}
+            onMouseDown={checkDeselect}
             onTouchStart={checkDeselect}
+            onMouseMove={mouseMoving}
+            onTouchMove={mouseMoving}
+            onMouseUp={mouseNotMoving}
+            onTouchEnd={mouseNotMoving}
           >
             <Layer>
-              <Rect
-                ref={selectionBoxRef}
-                width={10}
-                height={50}
-                scaleX={1}
-                scaleY={1}
-                x={100}
-                y={100}
-                fill="#4d7cc9"
-                stroke="#052963"
-                opacity={0.1}
-                visible={selectionBoxVisible ? true : false}
-              />
+              <Rect ref={selectionRef} fill="blue" opacity={0.2} />
+              {nodes.map((node, index) => (
+                <CanvasNode
+                  key={index}
+                  nodeProps={node}
+                  isSelected={node.id === selectId}
+                  onSelect={() => {
+                    setSelectId(node.id);
+                  }}
+                  onChange={(newAttrs) => {
+                    const newNodes = nodes.slice();
+                    newNodes[index] = newAttrs;
+                    setNodes(newNodes);
+                  }}
+                />
+              ))}
             </Layer>
-            {/* <Layer>
-              {rectangles.map((rect, index) => {
-                return (
-                  <Rectangle
-                    key={index}
-                    shapeProps={rect}
-                    isSelected={rect.id === selectedShape}
-                    onSelect={() => {
-                      setSelectedShape(rect.id);
-                    }}
-                    onChange={(newAttributes) => {
-                      const rects = rectangles.slice();
-                      rects[index] = newAttributes;
-                      setRectangles(rects);
-                    }}
-                    onMouseEnter={onMouseEnterCanvas}
-                    onMouseLeave={onMouseLeaveCanvas}
-                  />
-                );
-              })}
-            </Layer> */}
-            {/* <Layer><Rect ref={textRef} /></Layer> */}
-            {/* <Layer>
-              <Text ref={textRef} text="these are words" draggable />
-            </Layer>
-            <Layer>
-              <Image ref={imageRef} image={image} opacity={0.5} draggable />
-              <Transformer ref={transformerRef} />
-            </Layer> */}
           </Stage>
-        </div>
-        <div style={{ border: "2px solid black" }}>
-          <p>Layers</p>
-          <div>
-            {layer.map((layer, index) => (
-              <div key={index}>
-                <p>shape {index}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
