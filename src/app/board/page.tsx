@@ -13,334 +13,6 @@ import {
 } from "react-konva";
 import useImage from "use-image";
 
-export function Rectangle({
-  shapeProps,
-  isSelected,
-  onSelect,
-  onChange,
-  onMouseEnter,
-  onMouseLeave,
-}) {
-  const [cursor, setCursor] = useState("default");
-  const shapeRef = useRef();
-  const trRef = useRef();
-
-  useEffect(() => {
-    if (shapeRef === null || trRef === null) return;
-    if (isSelected) {
-      trRef.current.nodes([shapeRef.current]);
-      trRef.current.getLayer().batchDraw();
-    }
-  }, [isSelected]);
-
-  return (
-    <>
-      <Rect
-        onClick={onSelect}
-        onMouseDown={onSelect}
-        onTap={onSelect}
-        onPointerDown={onSelect}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        ref={shapeRef}
-        {...shapeProps}
-        draggable
-        onDragEnd={(e) => {
-          onChange({ ...shapeProps, x: e.target.x(), y: e.target.y() });
-        }}
-        onTransformEnd={(e) => {
-          const node = shapeRef.current;
-          const scaleX = node.scaleX();
-          const scaleY = node.scaleY();
-
-          node.scaleX(1);
-          node.scaleY(1);
-          onChange({
-            ...shapeProps,
-            x: node.x(),
-            y: node.y(),
-            width: Math.max(5, node.width() * scaleX),
-            height: Math.max(node.height() * scaleY),
-          });
-        }}
-      />
-      {isSelected && (
-        <Transformer
-          ref={trRef}
-          flipEnabled={false}
-          rotateEnabled={false}
-          boundBoxFunc={(oldBox, newBox) => {
-            if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
-              return oldBox;
-            }
-          }}
-          borderStroke="black"
-          anchorStroke="black"
-          anchorFill="pink"
-          enabledAnchors={[
-            "top-left",
-            "top-right",
-            "bottom-left",
-            "bottom-right",
-          ]}
-        />
-      )}
-    </>
-  );
-}
-
-const ImageStrategy = ({
-  nodeProps,
-  isSelected,
-  onSelect,
-  onChange,
-}: CanvasNodeProps) => {
-  const [image] = useImage(nodeProps.url);
-  const imageReference = useRef<typeof Image>(null);
-  const transformerReference = useRef<typeof Transformer>(null);
-
-  useEffect(() => {
-    if (isSelected) {
-      transformerReference.current!.nodes([imageReference.current]);
-      transformerReference.current!.getLayer().batchDraw();
-    }
-  }, [isSelected]);
-  return (
-    <>
-      <Image
-        ref={imageReference}
-        image={image}
-        draggable
-        onClick={onSelect}
-        onTap={onSelect}
-        onDragEnd={(e) => {
-          onChange({
-            ...nodeProps,
-            x: e.target.x(),
-            y: e.target.y(),
-          });
-        }}
-        onTransformEnd={(e) => {
-          const node = imageReference.current;
-          if (node === null) {
-            return;
-          }
-          const scaleX = node.scaleX();
-          const scaleY = node.scaleY();
-
-          node.scaleX(1);
-          node.scaleY(1);
-
-          onChange({
-            ...nodeProps,
-            x: node.x(),
-            y: node.y(),
-
-            width: Math.max(5, node.width() * scaleX),
-            height: Math.max(node.height() * scaleY),
-          });
-        }}
-        {...nodeProps}
-      />
-      {isSelected && (
-        <Transformer
-          ref={transformerReference}
-          flipEnabled={false}
-          rotateEnabled={false}
-          boundBoxFunc={(oldBox, newBox) => {
-            if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
-              return oldBox;
-            }
-            return newBox;
-          }}
-        />
-      )}
-    </>
-  );
-};
-
-type CanvasNodeProps = {
-  nodeProps: nodeProps;
-  isSelected: boolean;
-  onSelect: () => void;
-  onChange: (newAttrs: nodeProps) => void;
-};
-
-export function CanvasNode({
-  nodeProps,
-  isSelected,
-  onSelect,
-  onChange,
-}: CanvasNodeProps) {
-  // const ImageStrategy = ({
-  //   nodeProps,
-  //   isSelected,
-  //   onSelect,
-  //   onChange,
-  // }: CanvasNodeProps) => {
-  //   const [image] = useImage(nodeProps.url);
-  //   const imageReference = useRef<typeof Image>(null);
-  //   const transformerReference = useRef<typeof Transformer>(null);
-
-  //   useEffect(() => {
-  //     if (isSelected) {
-  //       transformerReference.current!.nodes([imageReference.current]);
-  //       transformerReference.current!.getLayer().batchDraw();
-  //     }
-  //   }, [isSelected]);
-  //   return (
-  //     <>
-  //       <Image
-  //         ref={imageReference}
-  //         image={image}
-  //         draggable
-  //         onClick={onSelect}
-  //         onTap={onSelect}
-  //         onDragEnd={(e) => {
-  //           onChange({
-  //             ...nodeProps,
-  //             x: e.target.x(),
-  //             y: e.target.y(),
-  //           });
-  //         }}
-  //         onTransformEnd={(e) => {
-  //           const node = imageReference.current;
-  //           if (node === null) {
-  //             return;
-  //           }
-  //           const scaleX = node.scaleX();
-  //           const scaleY = node.scaleY();
-
-  //           node.scaleX(1);
-  //           node.scaleY(1);
-
-  //           onChange({
-  //             ...nodeProps,
-  //             x: node.x(),
-  //             y: node.y(),
-
-  //             width: Math.max(5, node.width() * scaleX),
-  //             height: Math.max(node.height() * scaleY),
-  //           });
-  //         }}
-  //         {...nodeProps}
-  //       />
-  //       {isSelected && (
-  //         <Transformer
-  //           ref={transformerReference}
-  //           flipEnabled={false}
-  //           rotateEnabled={false}
-  //           boundBoxFunc={(oldBox, newBox) => {
-  //             if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
-  //               return oldBox;
-  //             }
-  //             return newBox;
-  //           }}
-  //         />
-  //       )}
-  //     </>
-  //   );
-  // };
-  const GifStrategy = () => {};
-  const TextStrategy = ({
-    nodeProps,
-    isSelected,
-    onSelect,
-    onChange,
-  }: CanvasNodeProps) => {
-    const textReference = useRef();
-    const transformerReference = useRef();
-
-    // useEffect(() => {
-    //   if (isSelected) {
-    //     transformerReference.current.nodes([textReference.current]);
-    //     transformerReference.current.getLayer().batchDraw();
-    //   }
-    // }, [isSelected]);
-    return (
-      <>
-        <Text
-          // ref={textReference}
-          draggable
-          // onClick={onSelect}
-          // onTap={onSelect}
-          // onDragEnd={(e) => {
-          //   onChange({ ...nodeProps, x: e.target.x(), y: e.target.y() });
-          // }}
-          // onTransformEnd={(e) => {
-          //   const node = textReference.current;
-          //   if (node === null) {
-          //     return;
-          //   }
-          //   const scaleX = node.scaleX();
-          //   const scaleY = node.scaleY();
-
-          //   node.scaleX(1);
-          //   node.scaleY(1);
-
-          //   onChange({
-          //     ...nodeProps,
-          //     x: node.x(),
-          //     y: node.y(),
-
-          //     width: Math.max(5, node.width() * scaleX),
-          //     height: Math.max(node.height() * scaleY),
-          //     fontSize: Math.max(node.height() * scaleY) / 2,
-          //   });
-          // }}
-          {...nodeProps}
-        />
-        {/* {isSelected && (
-          <Transformer
-            ref={transformerReference}
-            flipEnabled={false}
-            rotateEnabled={false}
-          />
-        )} */}
-      </>
-    );
-  };
-  return (
-    <>
-      {nodeProps.name === "image" && (
-        <ImageStrategy
-          nodeProps={nodeProps}
-          isSelected={isSelected}
-          onSelect={onSelect}
-          onChange={onChange}
-        />
-      )}
-      {nodeProps.name === "text" && (
-        <TextStrategy
-          nodeProps={nodeProps}
-          isSelected={isSelected}
-          onSelect={onSelect}
-          onChange={onChange}
-        />
-      )}
-    </>
-  );
-}
-
-const initialRectangles = [
-  {
-    x: 10,
-    y: 10,
-    width: 100,
-    height: 100,
-    fill: "red",
-    id: "rect1",
-  },
-  {
-    x: 150,
-    y: 150,
-    width: 100,
-    height: 100,
-    fill: "green",
-    id: "rect2",
-  },
-];
-
 type nodeProps = {
   id: string;
   name: string;
@@ -354,6 +26,11 @@ type nodeProps = {
   url?: string;
 };
 
+type CanvasNodeProps = {
+  nodeProps: nodeProps;
+  onChange: (newAttrs: nodeProps) => void;
+};
+
 type SelectionBoxCoordinatesProps = {
   x1: string;
   y1: string;
@@ -361,18 +38,90 @@ type SelectionBoxCoordinatesProps = {
   y2: string;
 };
 
+export const ImageNode = ({ nodeProps, onChange }: CanvasNodeProps) => {
+  const [image] = useImage(nodeProps.url);
+  return (
+    <Image
+      image={image}
+      draggable
+      {...nodeProps}
+      onDragEnd={(e) => {
+        const newX = e.target.x();
+        const newY = e.target.y();
+
+        onChange({ ...nodeProps, x: newX, y: newY });
+      }}
+      onTransformEnd={(e) => {
+        const node = e.target;
+        if (node === null) {
+          return;
+        }
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+
+        node.scaleX(1);
+        node.scaleY(1);
+
+        onChange({
+          ...nodeProps,
+          x: node.x(),
+          y: node.y(),
+
+          width: Math.max(5, node.width() * scaleX),
+          height: Math.max(node.height() * scaleY),
+        });
+      }}
+    />
+  );
+};
+export const TextNode = ({ nodeProps, onChange }: CanvasNodeProps) => {
+  return (
+    <Text
+      {...nodeProps}
+      draggable
+      onDragEnd={(e) => {
+        const newX = e.target.x();
+        const newY = e.target.y();
+
+        onChange({ ...nodeProps, x: newX, y: newY });
+      }}
+      onTransformEnd={(e) => {
+        const node = e.target;
+        if (node === null) {
+          return;
+        }
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+
+        node.scaleX(1);
+        node.scaleY(1);
+
+        onChange({
+          ...nodeProps,
+          x: node.x(),
+          y: node.y(),
+
+          width: Math.max(5, node.width() * scaleX),
+          height: Math.max(node.height() * scaleY),
+          fontSize: Math.max(node.height() * scaleY) / 2,
+        });
+      }}
+    />
+  );
+};
+
 const defaultNodes: nodeProps[] = [
-  // {
-  //   id: "1",
-  //   name: "text",
-  //   x: 10,
-  //   y: 10,
-  //   width: 150,
-  //   height: 50,
-  //   text: "Text that will be editable",
-  //   stroke: "blue",
-  //   fontSize: 25,
-  // },
+  {
+    id: "1",
+    name: "text",
+    x: 10,
+    y: 10,
+    width: 150,
+    height: 50,
+    text: "Text that will be editable",
+    stroke: "blue",
+    fontSize: 25,
+  },
   {
     id: "2",
     name: "image",
@@ -394,10 +143,6 @@ export default function Board() {
   const layerRef = useRef();
   const selectionRef = useRef<typeof Rect>(null);
   const transformerRef = useRef<Transformer>(null);
-  const tempRef = useRef(null);
-  const secondRef = useRef(null);
-  const tempRect = useRef(null);
-  const tempRect2 = useRef(null);
 
   useEffect(() => {}, []);
 
@@ -420,17 +165,17 @@ export default function Board() {
       return;
     }
 
-    // setSelectId(null);
+    setSelectId(null);
 
-    // const x1 = stage.getPointerPosition().x;
-    // const y1 = stage.getPointerPosition().y;
-    // const x2 = stage.getPointerPosition().x;
-    // const y2 = stage.getPointerPosition().y;
+    const x1 = stage.getPointerPosition().x;
+    const y1 = stage.getPointerPosition().y;
+    const x2 = stage.getPointerPosition().x;
+    const y2 = stage.getPointerPosition().y;
 
-    // setSelectionBoxCoordinates({ x1: x1, y1: y1, x2: x2, y2: y2 });
-    // selectionRef.current!.setAttr("width", 0);
-    // selectionRef.current!.setAttr("height", 0);
-    // setSelecting(true);
+    setSelectionBoxCoordinates({ x1: x1, y1: y1, x2: x2, y2: y2 });
+    selectionRef.current!.setAttr("width", 0);
+    selectionRef.current!.setAttr("height", 0);
+    setSelecting(true);
   };
 
   const mouseMoving = (e) => {
@@ -488,8 +233,11 @@ export default function Board() {
     if (e.target === stage) {
       transformerRef.current!.nodes([]);
       return;
-    }
+    } else transformerRef.current!.nodes([e.target]);
+
+    console.log(e.target);
   };
+
   return (
     <div
       style={{
@@ -527,14 +275,14 @@ export default function Board() {
             width={1000}
             height={1000}
             style={{ border: "2px solid black" }}
-            // onClick={onStageClick}
-            // onTap={onStageClick}
+            onClick={onStageClick}
+            onTap={onStageClick}
             onMouseDown={checkDeselect}
             onTouchStart={checkDeselect}
-            // onMouseMove={mouseMoving}
-            // onTouchMove={mouseMoving}
-            // onMouseUp={mouseNotMoving}
-            // onTouchEnd={mouseNotMoving}
+            onMouseMove={mouseMoving}
+            onTouchMove={mouseMoving}
+            onMouseUp={mouseNotMoving}
+            onTouchEnd={mouseNotMoving}
           >
             <Layer ref={layerRef}>
               <Transformer
@@ -543,47 +291,35 @@ export default function Board() {
                 flipEnabled={false}
                 rotateEnabled={false}
               />
-              {/* <Rect ref={selectionRef} fill="blue" opacity={0.2} />
-              <Rect
-                ref={tempRect}
-                fill="blue"
-                x={10}
-                y={10}
-                height={50}
-                width={50}
-                draggable
-              />
-              <Text
-                ref={tempRect2}
-                fill="red"
-                text="OMGG"
-                x={50}
-                y={10}
-                height={50}
-                width={50}
-                draggable
-              />
-              <Transformer ref={tempRef} rotateEnabled={false} />
-              <Transformer ref={secondRef} /> */}
+              <Rect ref={selectionRef} fill="blue" opacity={0.2} />
 
               {nodes.map((node, index) => {
-                // return (
-                //   <CanvasNode
-                //     key={index}
-                //     nodeProps={node}
-                //     isSelected={node.id === selectId}
-                //     onSelect={() => {
-                //       console.log("node with id: ", node.id);
-                //       setSelectId(node.id);
-                //     }}
-                //     onChange={(newAttrs) => {
-                //       const newNodes = nodes.slice();
-                //       newNodes[index] = newAttrs;
-                //       setNodes(newNodes);
-                //     }}
-                //   />
-                // );
-                return <ImageStrategy nodeProps={node} />;
+                const nodeType = node.name;
+                switch (nodeType) {
+                  case "image":
+                    return (
+                      <ImageNode
+                        nodeProps={node}
+                        onChange={(newAttrs) => {
+                          const newNodes = nodes.slice();
+                          newNodes[index] = newAttrs;
+                          setNodes(newNodes);
+                        }}
+                      />
+                    );
+                  case "text":
+                    return (
+                      <TextNode
+                        nodeProps={node}
+                        onChange={(newAttrs) => {
+                          const newNodes = nodes.slice();
+                          newNodes[index] = newAttrs;
+                          setNodes(newNodes);
+                        }}
+                      />
+                    );
+                  default:
+                }
               })}
             </Layer>
           </Stage>
